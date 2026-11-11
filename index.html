@@ -1,0 +1,1255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcform</title>
+<meta name="description" content="Build radial bar charts along any arc, from your own data, and export clean SVG.">
+<meta property="og:title" content="Arcform">
+<meta property="og:description" content="Build radial bar charts along any arc, from your own data, and export clean SVG.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Crect width='34' height='34' rx='8' fill='%231f6f68'/%3E%3Cg stroke='%23fff' stroke-linecap='round' stroke-width='2.6'%3E%3Cline x1='17' y1='19' x2='17' y2='6'/%3E%3Cline x1='17' y1='19' x2='25' y2='9.5'/%3E%3Cline x1='17' y1='19' x2='28' y2='19'/%3E%3C/g%3E%3Ccircle cx='17' cy='19' r='3.4' fill='%231f6f68' stroke='%23fff' stroke-width='1.8'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --surface-page:#eef1ee;
+    --surface-panel:#ffffff;
+    --surface-stage:#fbfbf9;
+    --surface-well:#f2f4f1;
+    --ink-primary:#14201d;
+    --ink-secondary:#54615c;
+    --ink-muted:#8a9490;
+    --border:rgba(20,32,29,0.13);
+    --border-strong:rgba(20,32,29,0.22);
+    --accent:#1f6f68;
+    --accent-strong:#134f49;
+    --accent-soft:rgba(31,111,104,0.13);
+    --accent-ink:#ffffff;
+    --danger:#b5503e;
+    --danger-soft:rgba(181,80,62,0.12);
+    --shadow: 0 1px 2px rgba(20,32,29,0.06), 0 8px 24px -12px rgba(20,32,29,0.18);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --surface-page:#0f1412;
+      --surface-panel:#161d1a;
+      --surface-stage:#12100e;
+      --surface-well:#1d2521;
+      --ink-primary:#f1f4f2;
+      --ink-secondary:#aeb9b4;
+      --ink-muted:#6d7874;
+      --border:rgba(241,244,242,0.12);
+      --border-strong:rgba(241,244,242,0.22);
+      --accent:#57bcb1;
+      --accent-strong:#8dd7cd;
+      --accent-soft:rgba(87,188,177,0.16);
+      --accent-ink:#08211e;
+      --danger:#e08972;
+      --danger-soft:rgba(224,137,114,0.14);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 28px -12px rgba(0,0,0,0.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --surface-page:#0f1412;
+    --surface-panel:#161d1a;
+    --surface-stage:#12100e;
+    --surface-well:#1d2521;
+    --ink-primary:#f1f4f2;
+    --ink-secondary:#aeb9b4;
+    --ink-muted:#6d7874;
+    --border:rgba(241,244,242,0.12);
+    --border-strong:rgba(241,244,242,0.22);
+    --accent:#57bcb1;
+    --accent-strong:#8dd7cd;
+    --accent-soft:rgba(87,188,177,0.16);
+    --accent-ink:#08211e;
+    --danger:#e08972;
+    --danger-soft:rgba(224,137,114,0.14);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 28px -12px rgba(0,0,0,0.55);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--surface-page);
+    color:var(--ink-primary);
+    font-family:"Work Sans", system-ui, sans-serif;
+    font-size:14px;
+    line-height:1.45;
+  }
+  .app{
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+  }
+
+  /* ---- header ---- */
+  header{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:16px 24px;
+    border-bottom:1px solid var(--border);
+    background:var(--surface-panel);
+  }
+  .mark{
+    width:34px;height:34px;flex:none;
+  }
+  header h1{
+    font-family:"Archivo", sans-serif;
+    font-weight:800;
+    font-size:20px;
+    letter-spacing:-0.01em;
+    margin:0;
+  }
+  header p{
+    margin:0;
+    color:var(--ink-secondary);
+    font-size:12.5px;
+  }
+  .head-text{display:flex;flex-direction:column;gap:1px;}
+
+  /* ---- layout ---- */
+  .layout{
+    display:grid;
+    grid-template-columns: 372px 1fr;
+    flex:1;
+    min-height:0;
+  }
+  @media (max-width: 780px){
+    .layout{grid-template-columns: 1fr;}
+    .sidebar{max-height:none;order:2;border-right:none;border-top:1px solid var(--border);}
+    .stage-wrap{order:1;}
+  }
+
+  .sidebar{
+    border-right:1px solid var(--border);
+    background:var(--surface-panel);
+    overflow-y:auto;
+    padding:20px 20px 40px;
+    display:flex;
+    flex-direction:column;
+    gap:22px;
+  }
+
+  section.panel{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  section.panel h2{
+    font-family:"Archivo", sans-serif;
+    font-weight:700;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:0.07em;
+    color:var(--ink-secondary);
+    margin:0;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--border);
+  }
+  .field-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .field-row + .field-row{margin-top:2px;}
+  label.field-label{
+    font-size:12.5px;
+    color:var(--ink-primary);
+    display:flex;
+    flex-direction:column;
+    gap:1px;
+  }
+  label.field-label span.hint{
+    font-size:11px;
+    color:var(--ink-muted);
+    font-weight:400;
+  }
+  .readout{
+    font-family:"IBM Plex Mono", monospace;
+    font-size:12px;
+    color:var(--ink-secondary);
+    min-width:38px;
+    text-align:right;
+    font-variant-numeric: tabular-nums;
+  }
+  input[type="range"]{
+    width:100%;
+    accent-color: var(--accent);
+    height:18px;
+  }
+  .slider-field{display:flex;flex-direction:column;gap:4px;}
+  .slider-field .top{display:flex;justify-content:space-between;align-items:baseline;}
+  .slider-field .top .name{font-size:12.5px;}
+  select, input[type="text"], input[type="number"], textarea{
+    font-family:"Work Sans", sans-serif;
+    font-size:13px;
+    color:var(--ink-primary);
+    background:var(--surface-well);
+    border:1px solid var(--border);
+    border-radius:7px;
+    padding:6px 8px;
+  }
+  input[type="number"]{font-family:"IBM Plex Mono", monospace;}
+  select{ -webkit-appearance:none; appearance:none; padding-right:24px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink-secondary) 50%), linear-gradient(135deg, var(--ink-secondary) 50%, transparent 50%);
+    background-position: right 11px top 55%, right 6px top 55%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat:no-repeat;
+  }
+  input[type="color"]{
+    width:32px;height:26px;border:1px solid var(--border-strong);border-radius:6px;padding:2px;background:var(--surface-well);cursor:pointer;
+  }
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 0;}
+  .switch{
+    position:relative; width:34px; height:20px; flex:none;
+  }
+  .switch input{position:absolute;inset:0;opacity:0;cursor:pointer;margin:0;}
+  .switch .track{
+    position:absolute;inset:0;border-radius:999px;background:var(--border-strong);transition:background .15s;
+  }
+  .switch .thumb{
+    position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--surface-panel);box-shadow:0 1px 2px rgba(0,0,0,0.3);transition:transform .15s;
+  }
+  .switch input:checked + .track{background:var(--accent);}
+  .switch input:checked + .track + .thumb{transform:translateX(14px);}
+
+  .btn{
+    font-family:"Work Sans", sans-serif;
+    font-weight:600;
+    font-size:13px;
+    border-radius:8px;
+    border:1px solid var(--border-strong);
+    background:var(--surface-well);
+    color:var(--ink-primary);
+    padding:8px 12px;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    justify-content:center;
+  }
+  .btn:hover{border-color:var(--accent);}
+  .btn:active{transform:translateY(1px);}
+  .btn.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--accent-ink);
+  }
+  .btn.primary:hover{background:var(--accent-strong);border-color:var(--accent-strong);}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--ink-secondary);padding:6px 8px;}
+  .btn.ghost:hover{color:var(--ink-primary);background:var(--surface-well);}
+  .btn.small{padding:5px 8px;font-size:12px;border-radius:6px;}
+  .btn:disabled{opacity:0.45;cursor:not-allowed;}
+  .btn:disabled:hover{border-color:var(--border-strong);}
+
+  /* data table */
+  .data-table{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    max-height:260px;
+    overflow-y:auto;
+    padding-right:2px;
+  }
+  .data-row{
+    display:grid;
+    grid-template-columns: 20px 1fr 76px 22px;
+    align-items:center;
+    gap:6px;
+  }
+  .data-row .swatch{
+    width:12px;height:12px;border-radius:3px;flex:none;
+    border:1px solid rgba(0,0,0,0.15);
+  }
+  .data-row input{width:100%;min-width:0;}
+  .row-remove{
+    width:22px;height:22px;border-radius:6px;border:none;background:transparent;color:var(--ink-muted);cursor:pointer;font-size:15px;line-height:1;
+  }
+  .row-remove:hover{color:var(--danger);background:var(--danger-soft);}
+  .table-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .upload-status{margin:0;font-size:11.5px;color:var(--ink-muted);min-height:14px;}
+  .upload-status.err{color:var(--danger);}
+  .upload-status.ok{color:var(--accent);}
+  .paste-box{display:none;flex-direction:column;gap:8px;margin-top:6px;}
+  .paste-box.open{display:flex;}
+  .paste-box textarea{
+    width:100%;min-height:96px;resize:vertical;font-family:"IBM Plex Mono", monospace;font-size:12px;
+  }
+
+  .swatch-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .swatch-row .chip{width:18px;height:18px;border-radius:5px;border:1px solid rgba(0,0,0,0.15);}
+
+  .segmented{
+    display:flex;
+    border:1px solid var(--border-strong);
+    border-radius:8px;
+    overflow:hidden;
+  }
+  .segmented button{
+    flex:1;
+    border:none;
+    background:var(--surface-well);
+    color:var(--ink-secondary);
+    font-family:"Work Sans", sans-serif;
+    font-size:12.5px;
+    font-weight:600;
+    padding:7px 4px;
+    cursor:pointer;
+  }
+  .segmented button + button{border-left:1px solid var(--border-strong);}
+  .segmented button.active{background:var(--accent);color:var(--accent-ink);}
+
+  /* ---- stage ---- */
+  .stage-wrap{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+  }
+  .stage-toolbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 24px;
+    border-bottom:1px solid var(--border);
+    flex-wrap:wrap;
+  }
+  .stage-toolbar .actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .export-status{font-size:12px;color:var(--ink-secondary);font-family:"IBM Plex Mono",monospace;}
+  .export-status.err{color:var(--danger);}
+  .export-status.ok{color:var(--accent);}
+
+  .stage{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px;
+    min-height:420px;
+    background:
+      radial-gradient(circle at center, transparent 0 0),
+      repeating-radial-gradient(circle at center, transparent 0px, transparent 38px, var(--border) 38px, var(--border) 39px);
+    background-color: var(--surface-stage);
+  }
+  .canvas-card{
+    background:var(--surface-panel);
+    border:1px solid var(--border);
+    border-radius:16px;
+    box-shadow:var(--shadow);
+    padding:18px;
+    max-width:min(680px, 100%);
+    width:100%;
+  }
+  #chart{width:100%;height:auto;display:block;}
+
+  .copy-fallback{
+    display:none;
+    padding:14px 24px;
+    border-top:1px solid var(--border);
+  }
+  .copy-fallback.open{display:block;}
+  .copy-fallback textarea{width:100%;height:110px;font-family:"IBM Plex Mono",monospace;font-size:11px;}
+  .copy-fallback p{margin:0 0 6px;font-size:12px;color:var(--ink-secondary);}
+
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:5px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <svg class="mark" viewBox="0 0 34 34" aria-hidden="true">
+      <circle cx="17" cy="17" r="15.5" fill="none" stroke="var(--border-strong)" stroke-width="1"/>
+      <path d="M17 3 A14 14 0 0 1 30.7 20.5" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>
+      <g stroke="var(--accent)" stroke-linecap="round">
+        <line x1="17" y1="17" x2="17" y2="6" stroke-width="2.6"/>
+        <line x1="17" y1="17" x2="24.5" y2="9.7" stroke-width="2.6"/>
+        <line x1="17" y1="17" x2="27.6" y2="17" stroke-width="2.6"/>
+        <line x1="17" y1="17" x2="24.5" y2="24.3" stroke-width="2"/>
+      </g>
+      <circle cx="17" cy="17" r="3.4" fill="var(--surface-panel)" stroke="var(--accent)" stroke-width="1.6"/>
+    </svg>
+    <div class="head-text">
+      <h1>Arcform</h1>
+      <p>Radial bar charts on any arc — your data, your sweep, exported as SVG.</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+
+      <section class="panel">
+        <h2>Data</h2>
+        <div class="data-table" id="dataTable"></div>
+        <div class="table-actions">
+          <button class="btn small" id="addRowBtn">+ Add row</button>
+          <button class="btn small ghost" id="uploadBtn">Upload file…</button>
+          <button class="btn small ghost" id="togglePasteBtn">Paste data…</button>
+          <button class="btn small ghost" id="sampleBtn">Load example</button>
+        </div>
+        <input type="file" id="fileInput" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,application/json" style="display:none;">
+        <p class="upload-status" id="uploadStatus">Upload a .csv, .tsv or .json file of label/value pairs.</p>
+        <div class="paste-box" id="pasteBox">
+          <p style="margin:0;font-size:12px;color:var(--ink-secondary);">One row per line: <code>label, value</code> (comma or tab separated).</p>
+          <textarea id="pasteArea" placeholder="Jan, 101&#10;Feb, 97&#10;Mar, 102"></textarea>
+          <div class="table-actions">
+            <button class="btn small primary" id="parsePasteBtn">Replace data</button>
+            <button class="btn small ghost" id="cancelPasteBtn">Cancel</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Arc &amp; geometry</h2>
+
+        <div class="slider-field">
+          <div class="top"><span class="name">Arc sweep</span><span class="readout" id="rSweep"></span></div>
+          <input type="range" id="sweep" min="1" max="360" step="1">
+        </div>
+        <div class="slider-field">
+          <div class="top"><span class="name">Start angle</span><span class="readout" id="rStart"></span></div>
+          <input type="range" id="startAngle" min="0" max="359" step="1">
+        </div>
+        <div class="field-row">
+          <label class="field-label">Direction</label>
+          <div class="segmented" style="width:150px;">
+            <button data-dir="1" id="dirCW">Clockwise</button>
+            <button data-dir="-1" id="dirCCW">Counter</button>
+          </div>
+        </div>
+        <div class="slider-field">
+          <div class="top"><span class="name">Inner radius</span><span class="readout" id="rInner"></span></div>
+          <input type="range" id="innerRadius" min="6" max="70" step="1">
+        </div>
+        <div class="slider-field">
+          <div class="top"><span class="name">Bar thickness</span><span class="readout" id="rThick"></span></div>
+          <input type="range" id="thickness" min="10" max="100" step="1">
+        </div>
+        <div class="toggle-row">
+          <label class="field-label">Rounded ends</label>
+          <label class="switch"><input type="checkbox" id="roundedEnds"><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="toggle-row">
+          <label class="field-label">Angle guide</label>
+          <label class="switch"><input type="checkbox" id="showGuide"><span class="track"></span><span class="thumb"></span></label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Scale</h2>
+        <div class="field-row">
+          <label class="field-label">Maximum value</label>
+          <div class="segmented" style="width:130px;">
+            <button data-scale="auto" id="scaleAuto">Auto</button>
+            <button data-scale="manual" id="scaleManual">Manual</button>
+          </div>
+        </div>
+        <div class="field-row" id="manualMaxRow" style="display:none;">
+          <label class="field-label">Max value<span class="hint">bars longer than this clip</span></label>
+          <input type="number" id="manualMaxInput" step="any" style="width:110px;">
+        </div>
+        <div class="field-row">
+          <label class="field-label">Value suffix</label>
+          <input type="text" id="valueSuffix" style="width:70px;text-align:right;" maxlength="6">
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Color</h2>
+        <div class="field-row">
+          <label class="field-label">Mode</label>
+          <select id="colorMode" style="width:150px;">
+            <option value="single">Single color</option>
+            <option value="sequential">By value (sequential)</option>
+            <option value="categorical">Categorical</option>
+          </select>
+        </div>
+        <div class="field-row" id="singleColorRow">
+          <label class="field-label">Bar color</label>
+          <input type="color" id="singleColor">
+        </div>
+        <div class="field-row" id="seqColorRow" style="display:none;">
+          <label class="field-label">Base hue</label>
+          <input type="color" id="seqColor">
+        </div>
+        <div id="catColorRow" style="display:none;">
+          <p style="margin:2px 0 0;font-size:11.5px;color:var(--ink-muted);">Fixed, CVD-checked order — repeats after 8 categories.</p>
+          <div class="swatch-row" id="catSwatches"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Labels</h2>
+        <div class="toggle-row">
+          <label class="field-label">Value labels</label>
+          <label class="switch"><input type="checkbox" id="showValueLabels"><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="toggle-row">
+          <label class="field-label">Curve along ring</label>
+          <label class="switch"><input type="checkbox" id="curveLabels"><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="toggle-row">
+          <label class="field-label">Flip for readability<span class="hint">keeps lower-half text upright</span></label>
+          <label class="switch"><input type="checkbox" id="flipLabels"><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="slider-field">
+          <div class="top"><span class="name">Label size</span><span class="readout" id="rLabelSize"></span></div>
+          <input type="range" id="labelSize" min="9" max="26" step="1">
+        </div>
+        <div class="toggle-row">
+          <label class="field-label">Category labels<span class="hint">outside the bars</span></label>
+          <label class="switch"><input type="checkbox" id="showCatLabels"><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="field-row">
+          <label class="field-label">Center title</label>
+          <input type="text" id="centerTitle" style="width:150px;" placeholder="optional">
+        </div>
+        <div class="field-row">
+          <label class="field-label">Center subtitle</label>
+          <input type="text" id="centerSub" style="width:150px;" placeholder="optional">
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Canvas</h2>
+        <div class="toggle-row">
+          <label class="field-label">Background fill</label>
+          <label class="switch"><input type="checkbox" id="bgOn"><span class="track"></span><span class="thumb"></span></label>
+        </div>
+        <div class="field-row" id="bgColorRow">
+          <label class="field-label">Background color</label>
+          <input type="color" id="bgColor">
+        </div>
+        <div class="field-row">
+          <label class="field-label">Inner disc fill</label>
+          <input type="color" id="discColor">
+        </div>
+        <div class="field-row">
+          <label class="field-label">Export size<span class="hint">pixels, square</span></label>
+          <input type="number" id="exportSize" min="200" max="4000" step="10" style="width:90px;">
+        </div>
+      </section>
+
+    </aside>
+
+    <div class="stage-wrap">
+      <div class="stage-toolbar">
+        <span class="export-status" id="exportStatus">SVG is generated live from your data.</span>
+        <div class="actions">
+          <button class="btn ghost small" id="copyBtn">Copy SVG code</button>
+          <button class="btn primary" id="exportBtn">Export SVG</button>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="canvas-card">
+          <svg id="chart" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+      </div>
+      <div class="copy-fallback" id="copyFallback">
+        <p>Select all and copy — paste into any SVG-aware app or save as a <code>.svg</code> file.</p>
+        <textarea id="copyArea" readonly></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var STORAGE_KEY = "arcform-state-v1";
+
+  var CATEGORICAL = ["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#4a3aa7","#e34948"];
+
+  var PLOT_OUTER = 400;
+  var GUIDE_R1 = 412, GUIDE_R2 = 424;
+  var CAT_LABEL_R = 442;
+  var CX = 500, CY = 500;
+
+  function uid(){ return Math.random().toString(36).slice(2, 9); }
+
+  var sampleData = [
+    {id:uid(), label:"W1", value:101}, {id:uid(), label:"W2", value:97},
+    {id:uid(), label:"W3", value:102}, {id:uid(), label:"W4", value:108},
+    {id:uid(), label:"W5", value:12},  {id:uid(), label:"W6", value:45},
+    {id:uid(), label:"W7", value:110}, {id:uid(), label:"W8", value:100},
+    {id:uid(), label:"W9", value:53},  {id:uid(), label:"W10", value:39},
+    {id:uid(), label:"W11", value:88}, {id:uid(), label:"W12", value:66},
+    {id:uid(), label:"W13", value:32}, {id:uid(), label:"W14", value:52},
+    {id:uid(), label:"W15", value:188},{id:uid(), label:"W16", value:76},
+    {id:uid(), label:"W17", value:38}, {id:uid(), label:"W18", value:135}
+  ];
+
+  var defaultState = {
+    data: sampleData,
+    sweep: 300,
+    startAngle: 30,
+    direction: 1,
+    innerRadiusPct: 32,
+    thicknessPct: 55,
+    roundedEnds: true,
+    showGuide: true,
+    scaleMode: "auto",
+    manualMax: 200,
+    valueSuffix: "%",
+    colorMode: "single",
+    singleColor: "#e0932c",
+    seqColor: "#1f6f68",
+    showValueLabels: true,
+    curveLabels: true,
+    flipLabels: true,
+    labelSize: 15,
+    showCatLabels: false,
+    centerTitle: "",
+    centerSub: "",
+    bgOn: true,
+    bgColor: "#5b5f5c",
+    discColor: "#d7d9d6",
+    exportSize: 1000
+  };
+
+  var state = loadState();
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return JSON.parse(JSON.stringify(defaultState));
+      var parsed = JSON.parse(raw);
+      var merged = Object.assign({}, defaultState, parsed);
+      if(!merged.data || !merged.data.length) merged.data = sampleData;
+      return merged;
+    }catch(e){
+      return JSON.parse(JSON.stringify(defaultState));
+    }
+  }
+
+  function saveState(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){ /* ignore */ }
+  }
+
+  // ---------- color helpers ----------
+  function hexToRgb(hex){
+    hex = hex.replace("#","");
+    if(hex.length === 3) hex = hex.split("").map(function(c){return c+c;}).join("");
+    var n = parseInt(hex,16);
+    return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 };
+  }
+  function rgbToHsl(r,g,b){
+    r/=255; g/=255; b/=255;
+    var max=Math.max(r,g,b), min=Math.min(r,g,b);
+    var h,s,l=(max+min)/2;
+    if(max===min){ h=s=0; }
+    else{
+      var d=max-min;
+      s = l>0.5 ? d/(2-max-min) : d/(max+min);
+      switch(max){
+        case r: h=(g-b)/d+(g<b?6:0); break;
+        case g: h=(b-r)/d+2; break;
+        default: h=(r-g)/d+4;
+      }
+      h/=6;
+    }
+    return {h:h*360, s:s*100, l:l*100};
+  }
+  function hslToHex(h,s,l){
+    h=((h%360)+360)%360; s=Math.max(0,Math.min(100,s))/100; l=Math.max(0,Math.min(100,l))/100;
+    var c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2, r,g,b;
+    if(h<60){r=c;g=x;b=0;} else if(h<120){r=x;g=c;b=0;} else if(h<180){r=0;g=c;b=x;}
+    else if(h<240){r=0;g=x;b=c;} else if(h<300){r=x;g=0;b=c;} else {r=c;g=0;b=x;}
+    var toHex=function(v){ var h2=Math.round((v+m)*255).toString(16); return h2.length<2?"0"+h2:h2; };
+    return "#"+toHex(r)+toHex(g)+toHex(b);
+  }
+  function sequentialColor(baseHex, frac){
+    var rgb = hexToRgb(baseHex);
+    var hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    var l = 84 - frac*48; // light (low value) -> dark (high value)
+    var s = Math.min(90, hsl.s + frac*12);
+    return hslToHex(hsl.h, s, l);
+  }
+  function luminance(hex){
+    var c = hexToRgb(hex);
+    return (0.299*c.r + 0.587*c.g + 0.114*c.b)/255;
+  }
+  function pickTextColor(bgHex){
+    return luminance(bgHex) > 0.62 ? "#1b2422" : "#ffffff";
+  }
+
+  // ---------- angle helpers ----------
+  function polar(r, angleDeg){
+    var rad = angleDeg * Math.PI/180;
+    return { x: CX + r*Math.sin(rad), y: CY - r*Math.cos(rad) };
+  }
+  function norm360(a){ return ((a%360)+360)%360; }
+
+  function el(tag, attrs){
+    var e = document.createElementNS(SVG_NS, tag);
+    if(attrs) for(var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // ---------- rendering ----------
+  function computeMax(){
+    if(state.scaleMode === "manual" && isFinite(state.manualMax) && state.manualMax > 0) return state.manualMax;
+    var max = 0;
+    state.data.forEach(function(d){ if(d.value > max) max = d.value; });
+    return max > 0 ? max : 1;
+  }
+
+  function barColor(d, i, n, frac){
+    if(state.colorMode === "single") return state.singleColor;
+    if(state.colorMode === "sequential") return sequentialColor(state.seqColor, frac);
+    return CATEGORICAL[i % CATEGORICAL.length];
+  }
+
+  function buildSVG(){
+    var svg = document.getElementById("chart");
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+
+    var innerR = PLOT_OUTER * (state.innerRadiusPct/100);
+    var barSpan = PLOT_OUTER - innerR;
+    var n = state.data.length;
+    var maxVal = computeMax();
+    var sweep = Math.max(1, Math.min(360, state.sweep));
+    var dir = state.direction;
+    var slot = n > 0 ? sweep / n : sweep;
+    var thickness = Math.max(0.6, slot * (state.thicknessPct/100)) * (Math.PI/180) * ((innerR+barSpan/2));
+    thickness = Math.min(thickness, 60);
+
+    // background
+    if(state.bgOn){
+      svg.appendChild(el("rect", {x:0,y:0,width:1000,height:1000, fill: state.bgColor}));
+    }
+
+    // angle guide rail
+    if(state.showGuide){
+      var guide = el("g", {opacity:"0.55"});
+      if(sweep >= 360){
+        guide.appendChild(el("circle", {cx:CX, cy:CY, r:GUIDE_R1, fill:"none", stroke: state.bgOn ? "#ffffff" : "#9aa39d", "stroke-opacity":"0.35", "stroke-width":"1.5"}));
+      } else {
+        var g1 = polar(GUIDE_R1, state.startAngle);
+        var g2 = polar(GUIDE_R1, state.startAngle + dir*sweep);
+        var large = sweep > 180 ? 1 : 0;
+        var sweepFlag = dir > 0 ? 1 : 0;
+        var d = "M "+g1.x.toFixed(2)+" "+g1.y.toFixed(2)+" A "+GUIDE_R1+" "+GUIDE_R1+" 0 "+large+" "+sweepFlag+" "+g2.x.toFixed(2)+" "+g2.y.toFixed(2);
+        guide.appendChild(el("path", {d:d, fill:"none", stroke: state.bgOn ? "#ffffff" : "#9aa39d", "stroke-opacity":"0.35", "stroke-width":"1.5"}));
+      }
+      var tickStep = sweep <= 60 ? 5 : sweep <= 150 ? 15 : sweep <= 270 ? 30 : 45;
+      for(var t = 0; t <= sweep + 0.001; t += tickStep){
+        if(sweep >= 360 && t >= sweep) continue;
+        var tt = Math.min(t, sweep);
+        var ang = state.startAngle + dir*tt;
+        var major = (Math.round(tt) % (tickStep*3) === 0) || tt === 0 || tt === sweep;
+        var p1 = polar(GUIDE_R1, ang);
+        var p2 = polar(major ? GUIDE_R2 + 5 : GUIDE_R2, ang);
+        guide.appendChild(el("line", {x1:p1.x.toFixed(2), y1:p1.y.toFixed(2), x2:p2.x.toFixed(2), y2:p2.y.toFixed(2),
+          stroke: state.bgOn ? "#ffffff" : "#9aa39d", "stroke-opacity": major ? "0.55" : "0.3", "stroke-width": major ? "1.6" : "1"}));
+      }
+      svg.appendChild(guide);
+    }
+
+    // inner disc
+    svg.appendChild(el("circle", {cx:CX, cy:CY, r:innerR, fill: state.discColor}));
+
+    var barsGroup = el("g");
+    var labelsGroup = el("g");
+    var catLabelsGroup = el("g");
+
+    state.data.forEach(function(d, i){
+      var frac = Math.max(0, Math.min(1, d.value / maxVal));
+      var len = barSpan * frac;
+      var centerAngle = state.startAngle + dir*(slot*(i+0.5));
+      var normAngle = norm360(centerAngle);
+      var p1 = polar(innerR, centerAngle);
+      var p2 = polar(innerR + Math.max(len, 0.0001), centerAngle);
+      var color = barColor(d, i, n, frac);
+      var pillColor = state.roundedEnds ? color : state.discColor;
+      var labelInk = pickTextColor(pillColor);
+
+      barsGroup.appendChild(el("line", {
+        x1:p1.x.toFixed(2), y1:p1.y.toFixed(2), x2:p2.x.toFixed(2), y2:p2.y.toFixed(2),
+        stroke: color, "stroke-width": thickness.toFixed(2),
+        "stroke-linecap": state.roundedEnds ? "round" : "butt"
+      }));
+
+      // value label, curved along inner ring
+      if(state.showValueLabels){
+        var valText = formatValue(d.value);
+        var labelR = Math.max(6, innerR - Math.max(14, state.labelSize*0.9));
+        if(state.curveLabels && slot > 0.001){
+          var halfSpan = Math.min(slot*0.42, 40);
+          var a1 = normAngle - halfSpan, a2 = normAngle + halfSpan;
+          var flip = state.flipLabels && normAngle > 90 && normAngle < 270;
+          if(flip){ var tmp=a1; a1=a2; a2=tmp; }
+          var lp1 = polar(labelR, a1);
+          var lp2 = polar(labelR, a2);
+          var largeArc = 0;
+          var sweepFl = (a2 > a1) ? 1 : 0;
+          var pathId = "lbl-path-"+i+"-"+d.id;
+          var lpath = el("path", {
+            id: pathId,
+            d: "M "+lp1.x.toFixed(2)+" "+lp1.y.toFixed(2)+" A "+labelR.toFixed(2)+" "+labelR.toFixed(2)+" 0 "+largeArc+" "+sweepFl+" "+lp2.x.toFixed(2)+" "+lp2.y.toFixed(2),
+            fill:"none"
+          });
+          labelsGroup.appendChild(lpath);
+          var text = el("text", {
+            "font-family":"IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, monospace",
+            "font-size": state.labelSize,
+            "font-weight":"600",
+            fill: labelInk,
+            "text-anchor":"middle"
+          });
+          var textPath = el("textPath", {href:"#"+pathId, startOffset:"50%"});
+          textPath.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", "#"+pathId);
+          textPath.textContent = valText;
+          text.appendChild(textPath);
+          labelsGroup.appendChild(text);
+        } else {
+          var lp = polar(labelR, normAngle);
+          var text2 = el("text", {
+            x: lp.x.toFixed(2), y: lp.y.toFixed(2),
+            "font-family":"IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, monospace",
+            "font-size": state.labelSize,
+            "font-weight":"600",
+            fill: labelInk,
+            "text-anchor":"middle",
+            "dominant-baseline":"middle"
+          });
+          text2.textContent = valText;
+          labelsGroup.appendChild(text2);
+        }
+      }
+
+      // category label, outside
+      if(state.showCatLabels){
+        var cp = polar(CAT_LABEL_R, normAngle);
+        var rot = (normAngle - 90) + (normAngle > 180 ? 180 : 0);
+        var anchor = normAngle > 180 ? "end" : "start";
+        var catBg = state.bgOn ? state.bgColor : "#f7f6f2";
+        var ct = el("text", {
+          x: cp.x.toFixed(2), y: cp.y.toFixed(2),
+          transform: "rotate("+rot.toFixed(2)+" "+cp.x.toFixed(2)+" "+cp.y.toFixed(2)+")",
+          "font-family":"Work Sans, sans-serif",
+          "font-size": Math.max(11, state.labelSize-3),
+          "font-weight":"500",
+          fill: pickTextColor(catBg),
+          "text-anchor": anchor,
+          "dominant-baseline":"middle"
+        });
+        ct.textContent = d.label;
+        catLabelsGroup.appendChild(ct);
+      }
+    });
+
+    svg.appendChild(barsGroup);
+    svg.appendChild(catLabelsGroup);
+    svg.appendChild(labelsGroup);
+
+    // center text
+    if(state.centerTitle || state.centerSub){
+      var cg = el("g", {"text-anchor":"middle"});
+      var centerInk = pickTextColor(state.discColor);
+      var titleColor = centerInk;
+      var subColor = centerInk === "#ffffff" ? "rgba(255,255,255,0.78)" : "#54615c";
+      if(state.centerTitle){
+        var tt = el("text", {x:CX, y: state.centerSub ? CY-6 : CY, "font-family":"Archivo, sans-serif", "font-weight":"800",
+          "font-size": Math.min(46, innerR*0.34), fill: titleColor, "dominant-baseline":"middle"});
+        tt.textContent = state.centerTitle;
+        cg.appendChild(tt);
+      }
+      if(state.centerSub){
+        var st = el("text", {x:CX, y: state.centerTitle ? CY+22 : CY, "font-family":"Work Sans, sans-serif", "font-weight":"500",
+          "font-size": Math.min(20, innerR*0.16), fill: subColor, "dominant-baseline":"middle"});
+        st.textContent = state.centerSub;
+        cg.appendChild(st);
+      }
+      svg.appendChild(cg);
+    }
+  }
+
+  function formatValue(v){
+    var num = (Math.round(v*100)/100).toString();
+    return num + (state.valueSuffix || "");
+  }
+
+  // ---------- data table UI ----------
+  function renderDataTable(){
+    var wrap = document.getElementById("dataTable");
+    wrap.innerHTML = "";
+    var n = state.data.length;
+    state.data.forEach(function(d, i){
+      var row = document.createElement("div");
+      row.className = "data-row";
+
+      var sw = document.createElement("div");
+      sw.className = "swatch";
+      var frac = 0;
+      var maxVal = computeMax();
+      frac = Math.max(0, Math.min(1, d.value / maxVal));
+      sw.style.background = barColor(d, i, n, frac);
+      row.appendChild(sw);
+
+      var labelInput = document.createElement("input");
+      labelInput.type = "text";
+      labelInput.value = d.label;
+      labelInput.addEventListener("input", function(){ d.label = labelInput.value; scheduleUpdate({skipTable:true}); });
+      row.appendChild(labelInput);
+
+      var valueInput = document.createElement("input");
+      valueInput.type = "number";
+      valueInput.step = "any";
+      valueInput.value = d.value;
+      valueInput.addEventListener("input", function(){
+        var v = parseFloat(valueInput.value);
+        d.value = isFinite(v) ? v : 0;
+        scheduleUpdate();
+      });
+      row.appendChild(valueInput);
+
+      var rm = document.createElement("button");
+      rm.className = "row-remove";
+      rm.textContent = "×";
+      rm.title = "Remove row";
+      rm.addEventListener("click", function(){
+        state.data.splice(i,1);
+        scheduleUpdate();
+      });
+      row.appendChild(rm);
+
+      wrap.appendChild(row);
+    });
+  }
+
+  function renderCategoricalSwatches(){
+    var wrap = document.getElementById("catSwatches");
+    wrap.innerHTML = "";
+    CATEGORICAL.forEach(function(hex){
+      var c = document.createElement("div");
+      c.className = "chip";
+      c.style.background = hex;
+      wrap.appendChild(c);
+    });
+  }
+
+  // ---------- controls sync ----------
+  var ctl = {};
+  ["sweep","startAngle","innerRadius","thickness","labelSize"].forEach(function(id){ ctl[id] = document.getElementById(id); });
+
+  function syncControlsFromState(){
+    ctl.sweep.value = state.sweep;
+    ctl.startAngle.value = state.startAngle;
+    ctl.innerRadius.value = state.innerRadiusPct;
+    ctl.thickness.value = state.thicknessPct;
+    ctl.labelSize.value = state.labelSize;
+
+    document.getElementById("rSweep").textContent = state.sweep + "°";
+    document.getElementById("rStart").textContent = state.startAngle + "°";
+    document.getElementById("rInner").textContent = state.innerRadiusPct + "%";
+    document.getElementById("rThick").textContent = state.thicknessPct + "%";
+    document.getElementById("rLabelSize").textContent = state.labelSize + "px";
+
+    document.getElementById("dirCW").classList.toggle("active", state.direction === 1);
+    document.getElementById("dirCCW").classList.toggle("active", state.direction === -1);
+
+    document.getElementById("roundedEnds").checked = state.roundedEnds;
+    document.getElementById("showGuide").checked = state.showGuide;
+
+    document.getElementById("scaleAuto").classList.toggle("active", state.scaleMode === "auto");
+    document.getElementById("scaleManual").classList.toggle("active", state.scaleMode === "manual");
+    document.getElementById("manualMaxRow").style.display = state.scaleMode === "manual" ? "flex" : "none";
+    document.getElementById("manualMaxInput").value = state.manualMax;
+    document.getElementById("valueSuffix").value = state.valueSuffix;
+
+    document.getElementById("colorMode").value = state.colorMode;
+    document.getElementById("singleColorRow").style.display = state.colorMode === "single" ? "flex" : "none";
+    document.getElementById("seqColorRow").style.display = state.colorMode === "sequential" ? "flex" : "none";
+    document.getElementById("catColorRow").style.display = state.colorMode === "categorical" ? "block" : "none";
+    document.getElementById("singleColor").value = state.singleColor;
+    document.getElementById("seqColor").value = state.seqColor;
+
+    document.getElementById("showValueLabels").checked = state.showValueLabels;
+    document.getElementById("curveLabels").checked = state.curveLabels;
+    document.getElementById("flipLabels").checked = state.flipLabels;
+    document.getElementById("showCatLabels").checked = state.showCatLabels;
+    document.getElementById("centerTitle").value = state.centerTitle;
+    document.getElementById("centerSub").value = state.centerSub;
+
+    document.getElementById("bgOn").checked = state.bgOn;
+    document.getElementById("bgColorRow").style.display = state.bgOn ? "flex" : "none";
+    document.getElementById("bgColor").value = state.bgColor;
+    document.getElementById("discColor").value = state.discColor;
+    document.getElementById("exportSize").value = state.exportSize;
+  }
+
+  var updateTimer = null;
+  function scheduleUpdate(opts){
+    opts = opts || {};
+    if(!opts.skipTable) renderDataTable();
+    renderCategoricalSwatches();
+    buildSVG();
+    if(updateTimer) clearTimeout(updateTimer);
+    updateTimer = setTimeout(saveState, 250);
+  }
+
+  function bindRange(id, prop, isInt){
+    document.getElementById(id).addEventListener("input", function(e){
+      var v = parseFloat(e.target.value);
+      state[prop] = isInt === false ? v : Math.round(v);
+      syncControlsFromState();
+      buildSVG();
+      if(updateTimer) clearTimeout(updateTimer);
+      updateTimer = setTimeout(saveState, 250);
+    });
+  }
+  bindRange("sweep","sweep");
+  bindRange("startAngle","startAngle");
+  bindRange("innerRadius","innerRadiusPct");
+  bindRange("thickness","thicknessPct");
+  bindRange("labelSize","labelSize");
+
+  document.getElementById("dirCW").addEventListener("click", function(){ state.direction = 1; syncControlsFromState(); scheduleUpdate({skipTable:true}); });
+  document.getElementById("dirCCW").addEventListener("click", function(){ state.direction = -1; syncControlsFromState(); scheduleUpdate({skipTable:true}); });
+
+  document.getElementById("roundedEnds").addEventListener("change", function(e){ state.roundedEnds = e.target.checked; scheduleUpdate({skipTable:true}); });
+  document.getElementById("showGuide").addEventListener("change", function(e){ state.showGuide = e.target.checked; scheduleUpdate({skipTable:true}); });
+
+  document.getElementById("scaleAuto").addEventListener("click", function(){ state.scaleMode = "auto"; syncControlsFromState(); scheduleUpdate(); });
+  document.getElementById("scaleManual").addEventListener("click", function(){ state.scaleMode = "manual"; syncControlsFromState(); scheduleUpdate(); });
+  document.getElementById("manualMaxInput").addEventListener("input", function(e){
+    var v = parseFloat(e.target.value);
+    state.manualMax = isFinite(v) ? v : state.manualMax;
+    scheduleUpdate();
+  });
+  document.getElementById("valueSuffix").addEventListener("input", function(e){ state.valueSuffix = e.target.value; scheduleUpdate({skipTable:true}); });
+
+  document.getElementById("colorMode").addEventListener("change", function(e){ state.colorMode = e.target.value; syncControlsFromState(); scheduleUpdate(); });
+  document.getElementById("singleColor").addEventListener("input", function(e){ state.singleColor = e.target.value; scheduleUpdate(); });
+  document.getElementById("seqColor").addEventListener("input", function(e){ state.seqColor = e.target.value; scheduleUpdate(); });
+
+  document.getElementById("showValueLabels").addEventListener("change", function(e){ state.showValueLabels = e.target.checked; scheduleUpdate({skipTable:true}); });
+  document.getElementById("curveLabels").addEventListener("change", function(e){ state.curveLabels = e.target.checked; scheduleUpdate({skipTable:true}); });
+  document.getElementById("flipLabels").addEventListener("change", function(e){ state.flipLabels = e.target.checked; scheduleUpdate({skipTable:true}); });
+  document.getElementById("showCatLabels").addEventListener("change", function(e){ state.showCatLabels = e.target.checked; scheduleUpdate({skipTable:true}); });
+  document.getElementById("centerTitle").addEventListener("input", function(e){ state.centerTitle = e.target.value; scheduleUpdate({skipTable:true}); });
+  document.getElementById("centerSub").addEventListener("input", function(e){ state.centerSub = e.target.value; scheduleUpdate({skipTable:true}); });
+
+  document.getElementById("bgOn").addEventListener("change", function(e){ state.bgOn = e.target.checked; syncControlsFromState(); scheduleUpdate({skipTable:true}); });
+  document.getElementById("bgColor").addEventListener("input", function(e){ state.bgColor = e.target.value; scheduleUpdate({skipTable:true}); });
+  document.getElementById("discColor").addEventListener("input", function(e){ state.discColor = e.target.value; scheduleUpdate({skipTable:true}); });
+  document.getElementById("exportSize").addEventListener("input", function(e){
+    var v = parseInt(e.target.value,10);
+    state.exportSize = isFinite(v) && v > 0 ? v : state.exportSize;
+    if(updateTimer) clearTimeout(updateTimer);
+    updateTimer = setTimeout(saveState, 250);
+  });
+
+  document.getElementById("addRowBtn").addEventListener("click", function(){
+    state.data.push({id:uid(), label:"New", value: 50});
+    scheduleUpdate();
+  });
+  document.getElementById("sampleBtn").addEventListener("click", function(){
+    state.data = JSON.parse(JSON.stringify(sampleData));
+    scheduleUpdate();
+  });
+
+  // ---------- shared row parsing (paste + file upload) ----------
+  function stripQuotes(s){
+    s = s.trim();
+    if(s.length >= 2 && ((s[0]=== '"' && s[s.length-1] === '"') || (s[0] === "'" && s[s.length-1] === "'"))){
+      return s.slice(1,-1).trim();
+    }
+    return s;
+  }
+
+  function parseDelimitedRows(text){
+    var lines = text.split(/\r?\n/).map(function(l){return l.trim();}).filter(Boolean);
+    var rows = [];
+    lines.forEach(function(line){
+      var sep = line.indexOf("\t") >= 0 ? "\t" : ",";
+      var parts = line.split(sep);
+      if(parts.length < 2) return;
+      var label = stripQuotes(parts[0]);
+      var value = parseFloat(stripQuotes(parts[1]));
+      if(!isFinite(value)){
+        // likely a header row; skip
+        return;
+      }
+      rows.push({id:uid(), label: label, value: value});
+    });
+    return rows;
+  }
+
+  function parseJSONRows(json){
+    var rows = [];
+    function addRow(label, value){
+      var v = parseFloat(value);
+      if(label !== undefined && label !== null && isFinite(v)){
+        rows.push({id:uid(), label: String(label), value: v});
+      }
+    }
+    if(Array.isArray(json)){
+      json.forEach(function(item){
+        if(Array.isArray(item)){
+          addRow(item[0], item[1]);
+        } else if(item && typeof item === "object"){
+          var labelKey = ["label","name","category","key","x"].find(function(k){ return k in item; });
+          var valueKey = ["value","val","amount","count","y"].find(function(k){ return k in item; });
+          if(!valueKey){
+            valueKey = Object.keys(item).find(function(k){ return typeof item[k] === "number"; });
+          }
+          if(!labelKey){
+            labelKey = Object.keys(item).find(function(k){ return k !== valueKey; });
+          }
+          if(labelKey && valueKey) addRow(item[labelKey], item[valueKey]);
+        }
+      });
+    } else if(json && typeof json === "object"){
+      Object.keys(json).forEach(function(k){ addRow(k, json[k]); });
+    }
+    return rows;
+  }
+
+  function setUploadStatus(msg, cls){
+    var s = document.getElementById("uploadStatus");
+    s.textContent = msg;
+    s.className = "upload-status" + (cls ? " " + cls : "");
+  }
+
+  function importRows(rows, sourceLabel){
+    if(rows && rows.length){
+      state.data = rows;
+      scheduleUpdate();
+      setUploadStatus("Loaded " + rows.length + " row" + (rows.length===1?"":"s") + (sourceLabel ? " from " + sourceLabel : "") + ".", "ok");
+    } else {
+      setUploadStatus("Couldn't find any label/value rows in that file.", "err");
+    }
+  }
+
+  document.getElementById("uploadBtn").addEventListener("click", function(){
+    document.getElementById("fileInput").click();
+  });
+  document.getElementById("fileInput").addEventListener("change", function(e){
+    var file = e.target.files && e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var text = String(reader.result || "");
+      var isJSON = /\.json$/i.test(file.name) || /^\s*[\[{]/.test(text);
+      var rows = [];
+      if(isJSON){
+        try{
+          rows = parseJSONRows(JSON.parse(text));
+        }catch(err){
+          setUploadStatus("That JSON file couldn't be parsed.", "err");
+          e.target.value = "";
+          return;
+        }
+      } else {
+        rows = parseDelimitedRows(text);
+      }
+      importRows(rows, file.name);
+      e.target.value = "";
+    };
+    reader.onerror = function(){
+      setUploadStatus("Couldn't read that file.", "err");
+      e.target.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById("togglePasteBtn").addEventListener("click", function(){
+    document.getElementById("pasteBox").classList.add("open");
+  });
+  document.getElementById("cancelPasteBtn").addEventListener("click", function(){
+    document.getElementById("pasteBox").classList.remove("open");
+  });
+  document.getElementById("parsePasteBtn").addEventListener("click", function(){
+    var raw = document.getElementById("pasteArea").value;
+    var rows = parseDelimitedRows(raw);
+    if(rows.length){
+      state.data = rows;
+      document.getElementById("pasteArea").value = "";
+      document.getElementById("pasteBox").classList.remove("open");
+      scheduleUpdate();
+    }
+  });
+
+  // ---------- export ----------
+  function serializeSVG(){
+    var svg = document.getElementById("chart");
+    var clone = svg.cloneNode(true);
+    clone.setAttribute("xmlns", SVG_NS);
+    clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+    var size = state.exportSize || 1000;
+    clone.setAttribute("width", size);
+    clone.setAttribute("height", size);
+    // resolve any css-variable fills left on category labels (already resolved at build time, but double check)
+    var serializer = new XMLSerializer();
+    var str = serializer.serializeToString(clone);
+    if(!/^<\?xml/.test(str)){
+      str = '<?xml version="1.0" encoding="UTF-8"?>\n' + str;
+    }
+    return str;
+  }
+
+  function setStatus(msg, cls){
+    var s = document.getElementById("exportStatus");
+    s.textContent = msg;
+    s.className = "export-status" + (cls ? " " + cls : "");
+  }
+
+  function downloadSVG(svgStr){
+    var blob = new Blob([svgStr], {type: "image/svg+xml;charset=utf-8"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "arcform-chart.svg";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+
+  document.getElementById("exportBtn").addEventListener("click", function(){
+    var svgStr = serializeSVG();
+    try{
+      downloadSVG(svgStr);
+      setStatus("Exported arcform-chart.svg", "ok");
+    }catch(err){
+      setStatus("Couldn't download directly — use Copy SVG code instead.", "err");
+      document.getElementById("copyArea").value = svgStr;
+      document.getElementById("copyFallback").classList.add("open");
+    }
+  });
+
+  document.getElementById("copyBtn").addEventListener("click", async function(){
+    var svgStr = serializeSVG();
+    try{
+      await navigator.clipboard.writeText(svgStr);
+      setStatus("SVG code copied to clipboard.", "ok");
+    }catch(e){
+      document.getElementById("copyArea").value = svgStr;
+      document.getElementById("copyFallback").classList.add("open");
+      document.getElementById("copyArea").focus();
+      document.getElementById("copyArea").select();
+      setStatus("Copy the code below.", "");
+    }
+  });
+
+  // ---------- boot ----------
+  syncControlsFromState();
+  renderCategoricalSwatches();
+  renderDataTable();
+  buildSVG();
+})();
+</script>
+</body>
+</html>
